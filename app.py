@@ -10,11 +10,19 @@ app = Flask(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
 
 
-@app.route("/")
+# ==========================
+# HOME
+# ==========================
+
+@app.route("/", methods=["GET"])
 def home():
+
     return jsonify({
         "status": "Weather Station API Running"
     })
@@ -23,6 +31,7 @@ def home():
 # ==========================
 # UPDATE WEATHER
 # ==========================
+
 @app.route("/api/weather/update", methods=["POST"])
 def update_weather():
 
@@ -30,7 +39,14 @@ def update_weather():
 
         data = request.get_json()
 
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No JSON data received"
+            }), 400
+
         weather = {
+            "id": 1,
             "temperature": data["temperature"],
             "humidity": data["humidity"],
             "mq7": data["mq7"],
@@ -38,17 +54,26 @@ def update_weather():
             "rain": data["rain"]
         }
 
-        supabase.table("weather_data") \
-            .update(weather) \
-            .eq("id", 1) \
+        # Create row if it doesn't exist,
+        # otherwise update the existing row
+        result = (
+            supabase
+            .table("weather_data")
+            .upsert(weather)
             .execute()
+        )
+
+        print("SUPABASE RESULT:", result.data)
 
         return jsonify({
             "success": True,
-            "message": "Weather Updated"
-        })
+            "message": "Weather Updated",
+            "data": result.data
+        }), 200
 
     except Exception as e:
+
+        print("SUPABASE ERROR:", str(e))
 
         return jsonify({
             "success": False,
@@ -59,17 +84,24 @@ def update_weather():
 # ==========================
 # GET LATEST WEATHER
 # ==========================
+
 @app.route("/api/weather/latest", methods=["GET"])
 def latest_weather():
 
     try:
 
-        response = supabase.table("weather_data") \
-            .select("*") \
-            .eq("id", 1) \
+        result = (
+            supabase
+            .table("weather_data")
+            .select("*")
+            .eq("id", 1)
             .execute()
+        )
 
-        return jsonify(response.data)
+        return jsonify({
+            "success": True,
+            "data": result.data
+        }), 200
 
     except Exception as e:
 
@@ -79,5 +111,13 @@ def latest_weather():
         }), 500
 
 
+# ==========================
+# START SERVER
+# ==========================
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000))
+    )
