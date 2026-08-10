@@ -3,59 +3,77 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 
+# Load .env
 load_dotenv()
 
+# Create Flask app
 app = Flask(__name__)
 
+# Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# Check credentials
+if not SUPABASE_URL:
+    raise ValueError("SUPABASE_URL is missing")
+
+if not SUPABASE_KEY:
+    raise ValueError("SUPABASE_KEY is missing")
+
+# Connect to Supabase
 supabase = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
 )
 
 
-# ==========================
+# =========================================================
 # HOME
-# ==========================
+# =========================================================
 
 @app.route("/", methods=["GET"])
 def home():
 
     return jsonify({
         "status": "Weather Station API Running"
-    })
+    }), 200
 
 
-# ==========================
+# =========================================================
 # UPDATE WEATHER
-# ==========================
+# =========================================================
 
 @app.route("/api/weather/update", methods=["POST"])
 def update_weather():
 
     try:
 
+        # Get JSON sent by Raspberry Pi
         data = request.get_json()
 
+        print("DATA RECEIVED:", data)
+
+        # Check data
         if not data:
+
             return jsonify({
                 "success": False,
                 "error": "No JSON data received"
             }), 400
 
+        # Create weather object
         weather = {
             "id": 1,
-            "temperature": data["temperature"],
-            "humidity": data["humidity"],
-            "mq7": data["mq7"],
-            "pm25": data["pm25"],
-            "rain": data["rain"]
+            "temperature": data.get("temperature"),
+            "humidity": data.get("humidity"),
+            "mq7": data.get("mq7"),
+            "pm25": data.get("pm25"),
+            "rain": data.get("rain")
         }
 
-        # Create row if it doesn't exist,
-        # otherwise update the existing row
+        print("DATA TO SUPABASE:", weather)
+
+        # Insert or update row
         result = (
             supabase
             .table("weather_data")
@@ -81,9 +99,9 @@ def update_weather():
         }), 500
 
 
-# ==========================
+# =========================================================
 # GET LATEST WEATHER
-# ==========================
+# =========================================================
 
 @app.route("/api/weather/latest", methods=["GET"])
 def latest_weather():
@@ -98,6 +116,8 @@ def latest_weather():
             .execute()
         )
 
+        print("LATEST DATA:", result.data)
+
         return jsonify({
             "success": True,
             "data": result.data
@@ -105,15 +125,17 @@ def latest_weather():
 
     except Exception as e:
 
+        print("GET WEATHER ERROR:", str(e))
+
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
 
 
-# ==========================
-# START SERVER
-# ==========================
+# =========================================================
+# RUN FLASK
+# =========================================================
 
 if __name__ == "__main__":
 
