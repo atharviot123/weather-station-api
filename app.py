@@ -12,8 +12,6 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-print("URL:", SUPABASE_URL)
-print("KEY:", SUPABASE_KEY)
 
 @app.route("/")
 def home():
