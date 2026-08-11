@@ -1,29 +1,56 @@
 from flask import Flask, request, jsonify
 from supabase import create_client
 from dotenv import load_dotenv
-import os
 from flask_cors import CORS
+from datetime import datetime, timezone
+import os
 
-# Load .env
+# =========================================================
+# LOAD .ENV
+# =========================================================
+
 load_dotenv()
 
-# Create Flask app
+
+# =========================================================
+# CREATE FLASK APP
+# =========================================================
+
 app = Flask(__name__)
 
 CORS(app)
 
-# Supabase credentials
+
+# =========================================================
+# RASPBERRY PI HEARTBEAT VARIABLE
+# =========================================================
+
+last_pi_heartbeat = None
+
+
+# =========================================================
+# SUPABASE CREDENTIALS
+# =========================================================
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Check credentials
+
+# =========================================================
+# CHECK SUPABASE CREDENTIALS
+# =========================================================
+
 if not SUPABASE_URL:
     raise ValueError("SUPABASE_URL is missing")
 
 if not SUPABASE_KEY:
     raise ValueError("SUPABASE_KEY is missing")
 
-# Connect to Supabase
+
+# =========================================================
+# CONNECT TO SUPABASE
+# =========================================================
+
 supabase = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -134,6 +161,59 @@ def latest_weather():
             "success": False,
             "error": str(e)
         }), 500
+
+
+# =========================================================
+# RASPBERRY PI HEARTBEAT
+# =========================================================
+
+@app.route("/api/pi/heartbeat", methods=["POST"])
+def pi_heartbeat():
+
+    global last_pi_heartbeat
+
+    last_pi_heartbeat = datetime.now(timezone.utc)
+
+    print("RASPBERRY PI HEARTBEAT RECEIVED")
+
+    return jsonify({
+        "online": True
+    }), 200
+
+
+# =========================================================
+# RASPBERRY PI STATUS
+# =========================================================
+
+@app.route("/api/pi/status", methods=["GET"])
+def pi_status():
+
+    global last_pi_heartbeat
+
+    # No heartbeat received yet
+    if last_pi_heartbeat is None:
+
+        return jsonify({
+            "online": False
+        }), 200
+
+    # Calculate how long ago the Pi sent heartbeat
+    seconds = (
+        datetime.now(timezone.utc) - last_pi_heartbeat
+    ).total_seconds()
+
+    # Pi is considered online if heartbeat
+    # was received within the last 10 seconds
+    online = seconds <= 10
+
+    print(
+        "RASPBERRY PI STATUS:",
+        "ONLINE" if online else "OFFLINE"
+    )
+
+    return jsonify({
+        "online": online
+    }), 200
 
 
 # =========================================================
